@@ -1,0 +1,15 @@
+# Copyright 2017 LasLabs Inc.
+# License Apache 2.0 (https://www.apache.org/licenses/LICENSE-2.0.html).
+
+---
+- hosts: localhost
+  remote_user: root
+  vars:
+    aws_ssh_key: ec2_docker_swarm_key
+    aws_security_group_name: ec2_docker_swarm_security_group
+    aws_region: us-east-1
+    aws_ami: ami-e2b033f4
+    aws_instance_type: t2.small
+    swarm_node_count: 2
+  roles:
+    - ansible-swarm-aws

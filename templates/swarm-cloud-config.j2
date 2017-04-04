@@ -1,0 +1,21 @@
+# Copyright 2017 LasLabs Inc.
+# License Apache 2.0 (https://www.apache.org/licenses/LICENSE-2.0.html).
+
+# cloud-config
+# Install Docker & Start on Boot
+
+repo_update: true
+repo_upgrade: all
+
+packages:
+  - python2-pip
+  - yum-utils
+
+pip:
+  - name: docker-py
+
+runcmd:
+  - yum-config-manager --add-repo https://download.docker.com/linux/centos/docker-ce.repo
+  - yum install -y docker-ce
+  - systemctl enable docker.service
+  - systemctl start docker.service

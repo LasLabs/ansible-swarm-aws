@@ -1,0 +1,21 @@
+# Copyright 2017 LasLabs Inc.
+# License Apache 2.0 (https://www.apache.org/licenses/LICENSE-2.0.html).
+
+[default]
+
+[swarm_manager]
+{% for item in swarm_manager.instances %}
+head ansible_host={{ item.public_ip }}
+{% endfor %}
+
+[swarm_nodes]
+{% for item in swarm_nodes.instances %}
+{{ item.public_ip }}
+{% endfor %}
+
+[swarm:children]
+head
+nodes
+
+[swarm:vars]
+ansible_ssh_user=centos ansible_ssh_private_key_file=~/.ssh/id_rsa_{{ awk_ssh_key }}

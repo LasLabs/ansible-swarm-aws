@@ -1,0 +1,8 @@
+[default]
+localhost
+
+[swarm_nodes]
+localhost
+
+[swarm_manager]
+localhost

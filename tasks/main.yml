@@ -1,0 +1,82 @@
+# Copyright 2017 LasLabs Inc.
+# License Apache 2.0 (https://www.apache.org/licenses/LICENSE-2.0.html).
+
+---
+# tasks file for swarm.role
+
+- name: Create EC2 SSH Key
+  ec2_key: name="{{ aws_ssh_key }}" region="{{ aws_region }}" state=present
+  register: ec2_key
+
+- name: Copy the newly Created EC2 SSH Key to the local machine
+  local_action: copy content="{{ ec2_key.key.private_key }}" dest="~/.ssh/id_rsa_{{ aws_ssh_key }}"
+  when: ec2_key.changed
+
+- name: Set the correct mode on the newly created key
+  file: path="~/.ssh/id_rsa_{{ aws_ssh_key }}" mode=0600
+  when: ec2_key.changed
+
+- name: Create Swarm Security Group
+  ec2_group:
+    name: "{{ aws_security_group_name }}" 
+    description: Security Group for Docker Swarm Machine(s)
+    region: "{{ aws_region }}"
+    rules:
+      - proto: tcp
+        from_port: 22
+        to_port: 22
+        cidr_ip: 0.0.0.0/0
+      - proto: tcp
+        from_port: 2377
+        to_port: 2377
+        group_name: "{{ aws_security_group_name }}"
+      - proto: udp
+        from_port: 8472
+        to_port: 8472
+        group_name: "{{ aws_security_group_name }}"
+    rules_egress:
+      - proto: udp
+        from_port: 8472
+        to_port: 8472
+        group_name: "{{ aws_security_group_name }}"
+      - proto: tcp
+        from_port: 0
+        to_port: 65535
+        cidr_ip: 0.0.0.0/0
+
+- name: Create Swarm Manager Machine
+  ec2:
+    region: "{{ aws_region }}"
+    image: "{{ aws_ami }}"
+    instance_type: "{{ aws_instance_type }}"
+    key_name: "{{ aws_ssh_key }}"
+    group: "{{ aws_security_group_name }}"
+    user_data: "{{ lookup('template', '../templates/swarm-cloud-config.j2') }}"
+    wait: yes
+  register: swarm_manager
+
+- debug: msg="Created Swarm Manager with IP {{item.public_ip}} <-> {{ item.private_ip}}"
+  with_items: swarm_manager.instances
+
+- name: Add Swarm Manager to Swarm Manager Host Group
+  add_host: hostname={{ item.public_ip }} groupname=swarm_manager
+  with_items: swarm_manager.instances
+
+- name: Create Swarm Node(s)
+  ec2:
+    region: "{{ aws_region }}"
+    image: "{{ aws_ami }}"
+    instance_type: "{{ aws_instance_type }}"
+    key_name: "{{ aws_ssh_key }}"
+    group: "{{ aws_security_group_name }}"
+    user_data: "{{ lookup('template', '../templates/swarm-cloud-config.j2') }}"
+    count: "{{ swarm_node_count }}"
+    wait: yes
+  register: swarm_nodes
+
+- name: Add Swarm Nodes to Host Group
+  add_host: hostname={{ item.public_ip }} groupname=swarm_nodes
+  with_items: swarm_nodes.instances
+
+- name: Create Host Inventory
+  template: src=inventory.j2 dest=./inventory
