@@ -52,6 +52,8 @@
     key_name: "{{ aws_ssh_key }}"
     group: "{{ aws_security_group_name }}"
     user_data: "{{ lookup('template', '../templates/swarm-cloud-config.j2') }}"
+    vpc_subnet_id: "{{ aws_vpc_subnet_id }}"
+    instance_tags: "{{ aws_instance_tags | combine(aws_instance_tags_manager) }}"
     wait: yes
   register: swarm_manager
 
@@ -71,6 +73,8 @@
     group: "{{ aws_security_group_name }}"
     user_data: "{{ lookup('template', '../templates/swarm-cloud-config.j2') }}"
     count: "{{ swarm_node_count }}"
+    vpc_subnet_id: "{{ aws_vpc_subnet_id }}"
+    instance_tags: "{{ aws_instance_tags | combine(aws_instance_tags_worker) }}"
     wait: yes
   register: swarm_nodes
 

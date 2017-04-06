@@ -20,6 +20,10 @@ Role Variables
 | aws_security_group_name | The name of the Security Group we create for the swarm nodes |
 | aws_region | The AWS region to spool the new nodes in |
 | aws_ami | The AMI to use as the base for the nodes |
+| aws_vpc_subnet_id | The Subnet in which to launch the instance. This will dictate which VPC you're launching within |
+| aws_instance_tags_manager | Tags for the manager instance being launched |
+| aws_instance_tags_worker | Tags for the instance worker instances being launched |
+| aws_instance_tags | Tags for all the instances that are launched |
 | aws_instance_type | The instance size/type to use for the nodes |
 | swarm_node_count | The number of worker nodes to launch |
 | swarm_iface | The ethernet interface to use for the Swarm. eth0 is default |
@@ -37,7 +41,14 @@ Example Playbook
         aws_security_group_name: ec2_docker_swarm_security_group
         aws_region: us-east-1
         aws_ami: ami-e2b033f4
+        aws_vpc_subnet_id: subnet-5a660898
         aws_instance_type: t2.small
+        aws_instance_tags:
+          Name: Docker Node
+        aws_instance_tags_manager:
+          Docker: Swarm Manager
+        aws_instance_tags_worker:
+          Docker: Swarm Worker
         swarm_node_count: 2
       roles:
          - ansible-swarm-aws
