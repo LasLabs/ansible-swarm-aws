@@ -1,6 +1,6 @@
 [![License: Apache 2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](https://www.apache.org/licenses/LICENSE-2.0.html)
 
-[![Build Status](https://travis-ci.org/LasLabs/ansible-aws-swarm.svg?branch=master)](https://travis-ci.org/LasLabs/ansible-aws-swarm)
+[![Build Status](https://travis-ci.org/LasLabs/ansible-swarm-aws.svg?branch=master)](https://travis-ci.org/LasLabs/ansible-swarm-aws)
 
 Ansible Swarm AWS
 =================
