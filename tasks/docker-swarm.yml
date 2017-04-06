@@ -1,0 +1,101 @@
+# Copyright 2017 LasLabs Inc.
+# License Apache 2.0 (https://www.apache.org/licenses/LICENSE-2.0.html).
+
+---
+# tasks file for swarm.role
+
+# Determine the status of the manager node(s) and split them into two host groups:
+# - swarm_manager_initialized (swarm is running and active)
+# - swarm_manager_bootstrap (host needs to be joined to the cluster)
+- hosts: swarm_manager
+  become: true
+  tasks:
+    - name: Determine Swarm Mangager Status
+      shell: >
+        docker info | egrep '^Swarm: ' | awk '{print $2}'
+      register: swarm_status
+
+    - name: Create swarm_manager_initialized host group
+      add_host: hostname="{{ item }}" groups=swarm_manager_initialized
+      with_items: "{{ ansible_play_hosts | default(play_hosts) }}"
+      when: "'active' in hostvars[item].swarm_status.stdout_lines"
+      run_once: true
+
+    - name: Create swarm_manager_bootstrap host group
+      add_host: hostname="{{ item }}" groups=swarm_manager_bootstrap
+      with_items: "{{ ansible_play_hosts | default(play_hosts) }}"
+      when: "'inactive' in hostvars[item].swarm_status.stdout_lines"
+      run_once: true
+
+# Determine the status of the manager node(s) and split them into two host groups:
+#   - swarm_nodes_initialized (host is joined to the swarm cluster)
+#   - swarm_nodes_bootstrap (host needs to be joined to the cluster)
+- hosts: swarm_nodes
+  become: true
+  tasks:
+    - name: Determine Swarm Node(s) Status
+      shell: >
+        docker info | egrep '^Swarm: ' | awk '{print $2}'
+      register: swarm_status
+
+    - name: Create swarm_nodes_initialized host group
+      add_host: hostname="{{ item }}" groups=swarm_nodes_initialized
+      with_items: "{{ ansible_play_hosts | default(play_hosts) }}"
+      when: "'active' in hostvars[item].swarm_status.stdout_lines"
+      run_once: true
+
+    - name: Create swarm_nodes_bootstrap host group
+      add_host: hostname="{{ item }}" groups=swarm_nodes_bootstrap
+      with_items: "{{ ansible_play_hosts | default(play_hosts) }}"
+      when: "'inactive' in hostvars[item].swarm_status.stdout_lines"
+      run_once: true
+
+# Initialize a Swarm Manager
+- hosts: swarm_manager_bootstrap[0]
+  become: true
+  tasks:
+    - name: Initialize swarm cluster
+      shell: docker swarm init --advertise-addr={{ swarm_iface | default('eth0') }}:2377
+      when: "'swarm_manager_initialized' not in groups"
+      register: bootstrap_first_node
+
+    - name: Add Initialized Host To swarm_manager_initialized host group
+      add_host: hostname="{{ item }}" groups=swarm_manager_initialized
+      with_items: "{{ ansible_play_hosts | default(play_hosts) }}"
+      when: bootstrap_first_node | changed
+
+# Retrieve All Swarm Node(s)/Manager(s) Tokens
+- hosts: swarm_manager_initialized[0]
+  become: true
+  vars:
+    iface: "{{ swarm_iface | default('eth0') }}"
+  tasks:
+    - name: Retrieve Swarm Manager Token
+      shell: docker swarm join-token -q manager
+      register: swarm_manager_token
+
+    - name: Retrieve Swarm Node(s) Token
+      shell: docker swarm join-token -q worker
+      register: swarm_node_token
+
+    - name: Populate Swarm Manager host group
+      add_host: hostname="{{ hostvars[item]['ansible_' + iface]['ipv4']['address'] }}" groups=swarm_manager_ips
+      with_items: "{{ ansible_play_hosts | default(play_hosts) }}"
+
+# Join Any Swarm Managers that need to the cluster
+- hosts: swarm_manager_bootstrap:!swarm_manager_initialized
+  become: true
+  vars:
+    token: "{{ hostvars[groups['swarm_manager_initialized'][0]]['swarm_manager_token']['stdout'] }}"
+  tasks:
+    - name: Join Swarm Manager Nodes To Cluster
+      shell: docker swarm join --advertise-addr={{ swarm_iface | default('eth0') }}:2377 --token={{ token }} {{ groups['swarm_manager_ips'][0] }}:2377
+
+# Join Any Swarm Managers that need to the cluster
+- hosts: swarm_nodes_bootstrap
+  become: true
+  vars:
+    token: "{{ hostvars[groups['swarm_manager_initialized'][0]]['swarm_node_token']['stdout'] }}"
+  tasks:
+    - name: Join Swarm Worker Node to Cluster
+      shell: docker swarm join --advertise-addr={{ swarm_iface | default('eth0') }}:2377 --token={{ token }} {{ groups['swarm_manager_ips'][0] }}:2377
